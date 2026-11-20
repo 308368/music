@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0f">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="轻量的移动端音乐播放器">
+  <title>汽水音乐</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<svg class="svg-defs" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path class="fill" d="m8 5 11 7-11 7Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6Z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6Z"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M18.5 9A7 7 0 0 0 6 6.5L4 9m2 6a7 7 0 0 0 12 2.5l2-2.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 6h12M4 11h12M4 16h7"/><path d="m16 15 4 2.5-4 2.5Z"/></symbol>
+  <symbol id="i-sequence" viewBox="0 0 24 24"><path d="M4 6h10M4 12h10M4 18h10M18 5v14m-3-3 3 3 3-3"/></symbol>
+  <symbol id="i-repeat-one" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3M11 10h2v5m-2 0h4"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="m18 4 3 3-3 3M3 7h3c5 0 7 10 12 10h3"/><path d="m18 14 3 3-3 3M3 17h3c1.8 0 3.2-1.3 4.5-3"/></symbol>
+  <symbol id="i-lyrics" viewBox="0 0 24 24"><path d="M5 6h14M5 10h10M5 14h14M5 18h7"/></symbol>
+</svg>
+<div id="app">
+  <header class="topbar"><h1 class="title">汽水音乐</h1><span class="status-dot" title="服务状态" aria-hidden="true"></span></header>
+  <main id="mainContent">
+    <label class="search-shell" id="searchShell" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">搜索歌曲或歌手</span>
+      <input id="searchInput" type="search" autocomplete="off" enterkeyhint="search" maxlength="80" placeholder="搜索歌曲或歌手">
+    </label>
+    <section class="view" data-view="home" id="homeView" aria-label="首页推荐"></section>
+    <section class="view" data-view="search" id="searchView" aria-label="搜索结果">
+      <div class="empty-state"><svg class="icon empty-icon" aria-hidden="true"><use href="#i-search"/></svg><p>搜索想听的歌</p><span>输入歌曲或歌手名称开始搜索</span></div>
+    </section>
+    <section class="view" data-view="profile" id="profileView" aria-label="我的音乐"></section>
+  </main>
+  <nav class="tabbar" aria-label="主导航">
+    <button class="tab active" data-go="home" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg><span>首页</span></button>
+    <button class="tab" data-go="search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span>搜索</span></button>
+    <button class="tab" data-go="profile"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span>我的</span></button>
+  </nav>
+  <aside id="player" aria-label="当前播放" aria-live="polite">
+    <button class="progress" id="pProgress" type="button" role="slider" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="fill" id="pFill"></span></button>
+    <button class="mini-open" id="miniOpen" type="button" aria-label="打开正在播放">
+      <span class="pcover" id="pCover" role="img" aria-label="当前歌曲封面"></span>
+      <span class="pmeta"><span class="pt" id="pTitle">未播放</span><span class="ps" id="pSub"></span></span>
+    </button>
+    <div class="pctl">
+      <button class="icon-button" id="pPrev" type="button" aria-label="上一首"><svg class="icon"><use href="#i-prev"/></svg></button>
+      <button class="icon-button mini-fav" id="pFav" type="button" aria-label="收藏"><svg class="icon"><use href="#i-heart"/></svg></button>
+      <button class="icon-button play" id="pPlay" type="button" aria-label="播放"><svg class="icon"><use href="#i-play"/></svg></button>
+      <button class="icon-button" id="pNext" type="button" aria-label="下一首"><svg class="icon"><use href="#i-next"/></svg></button>
+    </div>
+  </aside>
+  <section class="now-playing" id="nowPlaying" role="dialog" aria-modal="true" aria-labelledby="npTitle" hidden>
+    <header class="np-header">
+      <button class="icon-button" id="npClose" type="button" aria-label="关闭正在播放"><svg class="icon"><use href="#i-close"/></svg></button>
+      <strong>正在播放</strong><span class="np-header-spacer" aria-hidden="true"></span>
+    </header>
+    <div class="np-body">
+      <div class="np-stage">
+        <button class="np-cover" id="npCover" type="button" aria-label="显示歌词"></button>
+        <section class="lyrics-panel" id="lyricsPanel" aria-label="歌词" aria-live="polite" hidden>
+          <div class="lyrics-content" id="lyricsContent"></div>
+        </section>
+      </div>
+      <div class="np-track-row">
+        <div class="np-meta"><h2 id="npTitle">未播放</h2><p id="npArtist"></p></div>
+        <button class="icon-button np-fav" id="npFav" type="button" aria-label="收藏"><svg class="icon"><use href="#i-heart"/></svg></button>
+      </div>
+      <div class="np-timeline">
+        <input id="npSeek" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度">
+        <div class="np-times"><time id="npCurrent">0:00</time><time id="npDuration">0:00</time></div>
+      </div>
+      <div class="np-controls">
+        <button class="icon-button np-utility" id="npMode" type="button" aria-label="播放模式：顺序播放，点击切换"><svg class="icon"><use href="#i-sequence"/></svg></button>
+        <button class="icon-button np-skip" id="npPrev" type="button" aria-label="上一首"><svg class="icon"><use href="#i-prev"/></svg></button>
+        <button class="icon-button np-play" id="npPlay" type="button" aria-label="播放"><svg class="icon"><use href="#i-play"/></svg></button>
+        <button class="icon-button np-skip" id="npNext" type="button" aria-label="下一首"><svg class="icon"><use href="#i-next"/></svg></button>
+        <button class="icon-button np-utility" id="npLyricsToggle" type="button" aria-label="显示歌词" aria-controls="lyricsPanel" aria-expanded="false"><svg class="icon"><use href="#i-lyrics"/></svg></button>
+      </div>
+      <button class="queue-toggle" id="queueToggle" type="button" aria-expanded="false" aria-controls="queuePanel"><svg class="icon"><use href="#i-queue"/></svg><span>播放队列</span><span id="queueCount"></span></button>
+      <div class="queue-panel" id="queuePanel" hidden><div class="queue-list" id="queueList"></div></div>
+    </div>
+  </section>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+<script src="js/api.js"></script><script src="js/player.js"></script><script src="js/app.js"></script>
+</body>
+</html>

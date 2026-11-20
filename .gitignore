@@ -1,0 +1,16 @@
+server/node_modules/
+.env
+.env.*
+!.env.example
+artifacts/
+*.log
+stream_url.txt
+playlist_result.json
+search_result.json
+e2e_report.json
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]

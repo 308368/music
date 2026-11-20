@@ -1,0 +1,78 @@
+apply plugin: 'com.android.application'
+apply plugin: 'com.chaquo.python'
+
+def webAssets = layout.buildDirectory.dir('generated/assets/web')
+def syncWebAssets = tasks.register('syncWebAssets', Sync) {
+    inputs.file(project.buildFile)
+    from(rootProject.file('../web'))
+    into(webAssets)
+    filteringCharset = 'UTF-8'
+    filesMatching('index.html') {
+        filter { line ->
+            line.replace('<script src="js/player.js"></script>',
+                '<script src="native-audio.js"></script><script src="js/player.js"></script>')
+                .replace('<h1 class="title">汽水音乐</h1>',
+                    '<div><h1 class="title">汽水音乐</h1><a href="/music-source" style="display:block;color:#bdbdc5;font-size:11px;line-height:18px">音源 · Neko歌姬计划 API</a></div>')
+                .replace('<span class="status-dot" title="服务状态" aria-hidden="true"></span>',
+                    '<a href="/network-settings" aria-label="网络设置" style="margin-left:auto;min-height:44px;display:inline-flex;align-items:center;gap:8px;color:inherit;font-size:14px;text-decoration:none"><span class="status-dot" aria-hidden="true"></span>网络设置</a>')
+        }
+    }
+    filesMatching('js/api.js') {
+        filter { line ->
+            line.replace('const params = new URLSearchParams({', 'const params = new URLSearchParams({ id: song?.id || "",')
+                .replace('无法连接服务，请确认后端已启动', '无法连接音源，请检查手机网络设置')
+                .replace('get(`/api/playlist?n=${n}`, { timeout: 120000, ...options })',
+                    'get(`/api/playlist?n=${n}${options?.refresh ? "&refresh=1" : ""}`, { timeout: 120000, ...options })')
+        }
+    }
+    filesMatching('js/app.js') {
+        filter { line ->
+            line.replace('<span class="s">${esc(song.channel || "未知歌手")}</span>',
+                '<span class="s">${esc([song.channel || "未知歌手", song.album].filter(Boolean).join(" · "))}</span>')
+                .replace('正在准备推荐歌曲', '正在查找本月抖音热曲')
+                .replace('async function loadHome() {', 'async function loadHome(refresh = false) {')
+                .replace('const { results = [] } = await API.playlist(20);',
+                    'const { results = [], title = "本月抖音热曲", source = "", message } = await API.playlist(20, { refresh });')
+                .replace('errorState("暂时没有推荐", "稍后再来看看", "重新加载")',
+                    'errorState(title, message || "暂时没有匹配的歌曲", "重新加载")')
+                .replace('<h2>今天听点什么</h2><span>${results.length} 首精选</span>',
+                    '<div><h2>${esc(title)}</h2><span id="homePlaylist">${esc(source)}</span></div><button class="icon-button" id="homeRefresh" type="button" aria-label="刷新抖音热曲" title="刷新抖音热曲">${icon("refresh")}</button>')
+                .replace('$(".retry", el)?.addEventListener("click", loadHome);',
+                    '$("#homeRefresh", el)?.addEventListener("click", () => loadHome(true)); $(".retry", el)?.addEventListener("click", () => loadHome(true));')
+        }
+    }
+}
+
+android {
+    namespace 'local.douyin.music'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'local.douyin.music'
+        minSdk 26
+        targetSdk 35
+        versionCode 6
+        versionName '3.2'
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
+    }
+
+    sourceSets.main.assets.srcDir(webAssets)
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version = '3.13'
+        buildPython 'python'
+        pip {
+            install '-r', project.file('requirements.txt').absolutePath
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn(syncWebAssets)
+}
