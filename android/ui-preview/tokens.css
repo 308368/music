@@ -1,0 +1,28 @@
+:root {
+  --color-surround: oklch(13% .013 244);
+  --color-paper: oklch(16% .016 244);
+  --color-panel: oklch(21% .021 244);
+  --color-lift: oklch(25% .024 244);
+  --color-rule: oklch(32% .024 244);
+  --color-ink: oklch(95% .013 244);
+  --color-muted: oklch(73% .021 244);
+  --color-accent: oklch(87% .105 221);
+  --color-on-accent: oklch(19% .025 244);
+  --color-shadow: oklch(10% .014 244 / .65);
+  --color-record: oklch(14% .014 244);
+  --color-groove: oklch(91% .012 244 / .085);
+  --color-reflection: oklch(80% .035 224 / .16);
+  --ease-settle: cubic-bezier(.2, .72, .24, 1);
+  --needle-drop: 420ms;
+  --font-body: "Aptos", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  --font-display: "Bahnschrift", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-panel: 16px;
+  --radius-control: 10px;
+}

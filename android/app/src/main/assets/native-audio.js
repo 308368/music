@@ -4,6 +4,7 @@
   if (!bridge) return;
 
   const emptyState = () => ({ currentTime: 0, duration: 0, paused: true, readyState: 0, ended: false });
+  const newTicket = () => Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
   const sourceId = (src) => {
     try { return new URL(src, location.href).searchParams.get("id"); }
     catch { return null; }
@@ -16,17 +17,22 @@
       this.source = "";
       this.ticket = "";
       this.attaching = false;
+      this.playingIntent = false;
       audio = this;
     }
     get src() { return this.source; }
     set src(value) {
       const song = Player.current();
       this.source = String(value);
-      this.ticket = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+      this.ticket = newTicket();
       this.state = emptyState();
+      this.playingIntent = false;
       if (!bridge.load(this.source, song?._title || song?.title || "", song?.channel || "", this.ticket)) {
         this.source = "";
-        queueMicrotask(() => this.dispatchEvent(new Event("error")));
+        const failedTicket = this.ticket;
+        queueMicrotask(() => {
+          if (this.ticket === failedTicket) this.dispatchEvent(new Event("error"));
+        });
       }
     }
     get paused() { return this.state.paused; }
@@ -40,19 +46,34 @@
       bridge.seek(seconds);
     }
     play() {
-      bridge.setPlaying(true);
+      if (this.source) {
+        this.playingIntent = true;
+        bridge.setPlaying(true);
+      }
       return Promise.resolve();
     }
-    pause() { bridge.setPlaying(false); }
+    pause() {
+      this.playingIntent = false;
+      bridge.setPlaying(false);
+    }
+    clear() {
+      this.ticket = newTicket();
+      this.source = "";
+      this.state = emptyState();
+      this.playingIntent = false;
+      bridge.clear(this.ticket);
+    }
   }
 
   window.Audio = NativeAudio;
   window.receiveNativeAudio = (event, state, ticket) => {
     if (!audio) return;
     if (event === "disconnect") {
+      if (ticket && audio.ticket && ticket !== audio.ticket) return;
       audio.source = "";
       audio.ticket = "";
       audio.state = emptyState();
+      audio.playingIntent = false;
       audio.dispatchEvent(new Event("pause"));
       return;
     }
@@ -62,6 +83,9 @@
     audio.source = state.src;
     audio.ticket = ticket;
     audio.state = state;
+    if ((event === "play" || event === "waiting") && !state.paused) audio.playingIntent = true;
+    if (event === "pause" || event === "ended" || event === "error") audio.playingIntent = false;
+    if (attaching && event === "sync") audio.playingIntent = !state.paused && !state.ended;
     if (attaching && state.readyState >= 1) {
       // A surviving service has a more recent position than localStorage.
       audio.attaching = true;
@@ -84,7 +108,7 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && homeDay !== currentDay()) {
       homeDay = currentDay();
-      loadHome();
+      loadPhoneHome();
     }
   });
   document.addEventListener("DOMContentLoaded", () => bridge.ready(), { once: true });

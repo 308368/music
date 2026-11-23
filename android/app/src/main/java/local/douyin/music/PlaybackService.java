@@ -16,12 +16,15 @@ import android.media.MediaMetadata;
 import android.media.MediaPlayer;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
+import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -35,14 +38,18 @@ public final class PlaybackService extends Service {
 
     private static final String CHANNEL = "playback";
     private static final int NOTICE = 101;
+    private static final String TAG = "MusicPlayback";
     private final LocalBinder binder = new LocalBinder();
     private final Handler main = new Handler(Looper.getMainLooper());
     private HandlerThread thread;
     private Handler worker;
     private Listener listener;
     private JSONObject status = new JSONObject();
+    private String activeTicket = "";
     private volatile boolean destroyed;
     private MediaSession session;
+    private PendingIntent openPlayer;
+    private NotificationManager notifications;
     private AudioManager manager;
     private AudioFocusRequest focus;
     private final AudioAttributes attributes = new AudioAttributes.Builder()
@@ -52,19 +59,24 @@ public final class PlaybackService extends Service {
     private MediaPlayer decoder;
     private boolean prepared, wantsPlay, ended, buffering, foreground, hasFocus, resumeOnGain;
     private long pendingSeek = -1;
-    private String source = "", title = "", artist = "";
+    private String source = "", title = "", artist = "", ticket = "";
 
     @Override public void onCreate() {
         super.onCreate();
         thread = new HandlerThread("music-playback");
         thread.start();
         worker = new Handler(thread.getLooper());
-        getSystemService(NotificationManager.class).createNotificationChannel(
+        notifications = getSystemService(NotificationManager.class);
+        notifications.createNotificationChannel(
             new NotificationChannel(CHANNEL, "音乐播放", NotificationManager.IMPORTANCE_LOW));
         manager = getSystemService(AudioManager.class);
         focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(attributes).setOnAudioFocusChangeListener(this::focusChanged, worker).build();
         session = new MediaSession(this, "Music");
+        Intent player = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        openPlayer = PendingIntent.getActivity(this, 0, player, PendingIntent.FLAG_IMMUTABLE);
+        session.setSessionActivity(openPlayer);
+        session.setPlaybackToLocal(attributes);
         session.setCallback(new MediaSession.Callback() {
             @Override public void onPlay() { playOnWorker(); }
             @Override public void onPause() { pauseOnWorker(false); }
@@ -82,7 +94,13 @@ public final class PlaybackService extends Service {
     @Override public IBinder onBind(Intent intent) { return binder; }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
+        Uri commandTarget = intent == null ? null : intent.getData();
         if (action != null) worker.post(() -> {
+            if (destroyed) return;
+            if (source.isEmpty() || commandTarget == null || !ticket.equals(commandTarget.getSchemeSpecificPart())) {
+                if (!foreground) stopSelfResult(startId);
+                return;
+            }
             switch (action) {
                 case "play": playOnWorker(); break;
                 case "pause": pauseOnWorker(false); break;
@@ -95,26 +113,47 @@ public final class PlaybackService extends Service {
 
     public void setListener(Listener next) { listener = next; }
     public JSONObject snapshot() { return status; }
-    public void load(String url, String name, String performer) {
-        worker.post(() -> loadOnWorker(url, name, performer));
+    public void load(String url, String name, String performer, String request) {
+        activeTicket = request;
+        worker.post(() -> {
+            ticket = request;
+            loadOnWorker(url, name, performer);
+        });
     }
     public void play() { worker.post(this::playOnWorker); }
     public void pause() { worker.post(() -> pauseOnWorker(false)); }
+    public void clear(String request) {
+        activeTicket = request;
+        status = new JSONObject();
+        worker.post(() -> {
+            ticket = request;
+            clearOnWorker("clear");
+        });
+    }
     public void networkChanged(Runnable done) {
         worker.post(() -> {
-            releaseDecoder();
-            wantsPlay = ended = resumeOnGain = false;
-            source = "";
-            pendingSeek = -1;
-            emit("disconnect");
-            updateSession();
-            idle.run();
-            getSystemService(NotificationManager.class).cancel(NOTICE);
+            clearOnWorker("disconnect");
             main.post(done);
         });
     }
     public void seek(double seconds) {
         if (Double.isFinite(seconds)) worker.post(() -> seekOnWorker(Math.max(0, (long)(seconds * 1000))));
+    }
+
+    private void clearOnWorker(String event) {
+        releaseDecoder();
+        wantsPlay = ended = buffering = resumeOnGain = false;
+        pendingSeek = -1;
+        source = title = artist = "";
+        releaseFocus();
+        if (foreground) {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+            foreground = false;
+        }
+        notifications.cancel(NOTICE);
+        stopSelf();
+        updateSession();
+        emit(event);
     }
 
     private void loadOnWorker(String url, String name, String performer) {
@@ -188,6 +227,10 @@ public final class PlaybackService extends Service {
                 startForeground(NOTICE, notification());
                 foreground = true;
                 startService(new Intent(this, PlaybackService.class));
+                NotificationChannel channel = notifications.getNotificationChannel(CHANNEL);
+                if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+                    Log.w(TAG, "The music playback notification channel is blocked");
+                }
             }
             if (!hasFocus) {
                 hasFocus = manager.requestAudioFocus(focus) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
@@ -201,10 +244,14 @@ public final class PlaybackService extends Service {
                 emit("play");
             } else emit("waiting");
             updateSession();
-        } catch (RuntimeException failure) { fail(); }
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Failed to enter or continue foreground playback", failure);
+            fail();
+        }
     }
 
     private void pauseOnWorker(boolean transientLoss) {
+        if (source.isEmpty()) return;
         resumeOnGain = transientLoss && wantsPlay;
         wantsPlay = false;
         if (prepared && decoder.isPlaying()) decoder.pause();
@@ -242,7 +289,7 @@ public final class PlaybackService extends Service {
     };
     private final Runnable idle = () -> {
         if (wantsPlay || resumeOnGain) return;
-        if (hasFocus) { manager.abandonAudioFocusRequest(focus); hasFocus = false; }
+        releaseFocus();
         if (foreground) {
             stopForeground(STOP_FOREGROUND_DETACH);
             foreground = false;
@@ -250,20 +297,27 @@ public final class PlaybackService extends Service {
         }
     };
 
+    private void releaseFocus() {
+        if (!hasFocus) return;
+        hasFocus = false;
+        manager.abandonAudioFocusRequest(focus);
+    }
+
     private long position() {
         if (pendingSeek >= 0) return pendingSeek;
         return prepared ? Math.max(0, decoder.getCurrentPosition()) : 0;
     }
     private void emit(String event) {
+        final String eventTicket = ticket;
         JSONObject state = new JSONObject();
         try {
-            state.put("src", source).put("currentTime", position() / 1000.0)
+            state.put("ticket", eventTicket).put("src", source).put("currentTime", position() / 1000.0)
                 .put("duration", prepared ? Math.max(0, decoder.getDuration()) / 1000.0 : 0)
                 .put("paused", !wantsPlay).put("readyState", prepared ? (buffering ? 2 : 4) : 0)
                 .put("ended", ended);
         } catch (JSONException impossible) { throw new AssertionError(impossible); }
         main.post(() -> {
-            if (destroyed) return;
+            if (destroyed || !eventTicket.equals(activeTicket)) return;
             status = state;
             if (listener != null) listener.onEvent(event);
         });
@@ -271,28 +325,40 @@ public final class PlaybackService extends Service {
 
     private void updateSession() {
         if (destroyed) return;
-        session.setActive(decoder != null);
+        if (source.isEmpty()) {
+            session.setActive(false);
+            session.setMetadata(null);
+            session.setPlaybackState(null);
+            return;
+        }
         MediaMetadata.Builder metadata = new MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, Uri.parse(source).getQueryParameter("id"))
             .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-            .putString(MediaMetadata.METADATA_KEY_ARTIST, artist);
+            .putString(MediaMetadata.METADATA_KEY_ARTIST, artist)
+            .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, artist);
         if (prepared) metadata.putLong(MediaMetadata.METADATA_KEY_DURATION, decoder.getDuration());
         session.setMetadata(metadata.build());
-        int state = wantsPlay ? (prepared && !buffering ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_BUFFERING)
+        int state = wantsPlay ? (prepared && !buffering && decoder.isPlaying()
+            ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_BUFFERING)
             : ended ? PlaybackState.STATE_STOPPED : PlaybackState.STATE_PAUSED;
         session.setPlaybackState(new PlaybackState.Builder().setActions(PlaybackState.ACTION_PLAY |
             PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SEEK_TO |
             PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
             .setState(state, position(), state == PlaybackState.STATE_PLAYING ? 1f : 0f).build());
-        if (foreground) getSystemService(NotificationManager.class).notify(NOTICE, notification());
+        session.setActive(decoder != null);
+        if (foreground) notifications.notify(NOTICE, notification());
     }
 
     private PendingIntent command(String action) {
-        Intent intent = new Intent(this, PlaybackService.class).setAction(action);
+        Intent intent = new Intent(this, PlaybackService.class).setAction(action)
+            .setData(Uri.fromParts("music-playback", ticket, null));
         return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
     }
     private Notification notification() {
         Notification.Builder builder = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_media_play).setContentTitle(title).setContentText(artist)
+            .setContentIntent(openPlayer)
             .setVisibility(Notification.VISIBILITY_PUBLIC).setOnlyAlertOnce(true).setOngoing(wantsPlay)
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken())
                 .setShowActionsInCompactView(0, 1, 2))
@@ -300,9 +366,9 @@ public final class PlaybackService extends Service {
             .addAction(wantsPlay ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                 wantsPlay ? "暂停" : "播放", command(wantsPlay ? "pause" : "play"))
             .addAction(android.R.drawable.ic_media_next, "下一首", command("next"));
-        Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
-        if (launch != null) builder.setContentIntent(PendingIntent.getActivity(this, 0,
-            launch.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
+        }
         return builder.build();
     }
 
@@ -313,7 +379,7 @@ public final class PlaybackService extends Service {
         emit("error");
         updateSession();
         idle.run();
-        getSystemService(NotificationManager.class).cancel(NOTICE);
+        notifications.cancel(NOTICE);
     }
     private void releaseDecoder() {
         worker.removeCallbacks(tick);
@@ -328,12 +394,12 @@ public final class PlaybackService extends Service {
         worker.removeCallbacksAndMessages(null);
         worker.post(() -> {
             releaseDecoder();
-            if (hasFocus) manager.abandonAudioFocusRequest(focus);
+            releaseFocus();
             session.release();
             thread.quitSafely();
         });
         stopForeground(STOP_FOREGROUND_REMOVE);
-        getSystemService(NotificationManager.class).cancel(NOTICE);
+        notifications.cancel(NOTICE);
         super.onDestroy();
     }
 }

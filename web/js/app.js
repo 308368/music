@@ -113,6 +113,8 @@ function bindPlayerBar() {
   const bar = $("#player"), play = $("#pPlay"), progress = $("#pProgress"), miniFav = $("#pFav");
   const nowPlaying = $("#nowPlaying"), npPlay = $("#npPlay"), npSeek = $("#npSeek"), npFav = $("#npFav");
   const backgroundSurfaces = [$(".topbar"), $("#mainContent"), $(".tabbar"), bar];
+  const phone = typeof createPhonePlayerSurface === "function" ? createPhonePlayerSurface(nowPlaying, backgroundSurfaces) : null;
+  const isNowPlayingOpen = () => phone ? phone.isOpen() : !nowPlaying.hidden;
   let queueSignature = "";
   let seekDragging = false;
   let restoreFocus = null;
@@ -122,10 +124,14 @@ function bindPlayerBar() {
   let lyricsLines = [];
   let activeLyricIndex = -1;
   let lyricsController = null;
+  let browsingLyrics = false;
+  let lyricsFollowTimer;
+  const lyricPointers = new Set();
   const lyricsCache = new Map();
   const lyricsPanel = $("#lyricsPanel"), lyricsContent = $("#lyricsContent"), lyricsToggle = $("#npLyricsToggle"), npCover = $("#npCover"), modeButton = $("#npMode");
   const modeMeta = {
     sequence: { label: "顺序播放", icon: "sequence" },
+    "repeat-all": { label: "列表循环", icon: "loop" },
     "repeat-one": { label: "单曲循环", icon: "repeat-one" },
     shuffle: { label: "随机播放", icon: "shuffle" },
   };
@@ -197,14 +203,47 @@ function bindPlayerBar() {
       renderLyricsState("歌词加载失败", userErrorMessage(error.message), true);
     }
   };
+  const centerCurrentLyric = () => {
+    if (!lyricsOpen || browsingLyrics || !isNowPlayingOpen() || activeLyricIndex < 0) return;
+    const line = lyricsContent.children[activeLyricIndex];
+    if (!line) return;
+    const row = line.getBoundingClientRect();
+    const panelTop = lyricsPanel.getBoundingClientRect().top + lyricsPanel.clientTop;
+    const top = lyricsPanel.scrollTop + row.top - panelTop + (row.height - lyricsPanel.clientHeight) / 2;
+    lyricsPanel.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  };
+  const scheduleLyricFollow = () => {
+    clearTimeout(lyricsFollowTimer);
+    if (lyricPointers.size) return;
+    lyricsFollowTimer = setTimeout(() => {
+      browsingLyrics = false;
+      centerCurrentLyric();
+    }, 2000);
+  };
+  const browseLyrics = () => {
+    if (!browsingLyrics) {
+      browsingLyrics = true;
+      // A new gesture takes over even if an automatic scroll is still in progress.
+      lyricsPanel.scrollTo({ top: lyricsPanel.scrollTop, behavior: "instant" });
+    }
+    scheduleLyricFollow();
+  };
+  const stopBrowsingLyrics = () => {
+    clearTimeout(lyricsFollowTimer);
+    lyricPointers.clear();
+    browsingLyrics = false;
+  };
   const setLyricsOpen = (open) => {
     lyricsOpen = Boolean(open);
+    phone?.setLyricsOpen(lyricsOpen);
     npCover.hidden = lyricsOpen;
     lyricsPanel.hidden = !lyricsOpen;
     lyricsToggle.classList.toggle("active", lyricsOpen);
     lyricsToggle.setAttribute("aria-expanded", String(lyricsOpen));
     lyricsToggle.setAttribute("aria-label", lyricsOpen ? "显示封面" : "显示歌词");
+    if (!lyricsOpen) stopBrowsingLyrics();
     if (lyricsOpen && Player.current() && lyricsSongId !== Player.current().id) loadLyrics(Player.current());
+    else if (lyricsOpen) centerCurrentLyric();
   };
   const updateActiveLyric = () => {
     if (!lyricsOpen || !lyricsLines.length) return;
@@ -217,42 +256,49 @@ function bindPlayerBar() {
       line.classList.toggle("active", active);
       active ? line.setAttribute("aria-current", "true") : line.removeAttribute("aria-current");
     });
-    if (activeLyricIndex >= 0) {
-      const activeLine = $$(".lyric-line", lyricsContent)[activeLyricIndex];
-      activeLine?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    }
+    centerCurrentLyric();
   };
   const syncModeButton = () => {
     const meta = modeMeta[Player.mode];
-    modeButton.innerHTML = icon(meta.icon);
+    modeButton.innerHTML = icon(phone && Player.mode === "sequence" ? "loop" : meta.icon);
     modeButton.dataset.mode = Player.mode;
     modeButton.classList.toggle("active", Player.mode !== "sequence");
     modeButton.setAttribute("aria-label", `播放模式：${meta.label}，点击切换`);
   };
   const renderQueue = () => {
+    if (phone) { phone.renderQueue(); return; }
     const list = Player.queue;
     const signature = `${Player.index}:${Player.paused}:${list.map((song) => song.id).join("|")}`;
     if (signature === queueSignature) return;
     queueSignature = signature;
     $("#queueCount").textContent = `${list.length} 首`;
-    $("#queueList").innerHTML = list.map((song, index) => `<button class="queue-item${index === Player.index ? " active" : ""}" type="button" data-queue-index="${index}" aria-current="${index === Player.index ? "true" : "false"}"><span class="queue-number">${index === Player.index ? icon(Player.paused ? "play" : "music") : index + 1}</span><span class="queue-meta"><strong>${esc(song._title || song.title || "未知歌曲")}</strong><span>${esc(song.channel || "未知歌手")}</span></span><span class="dur">${esc(song.duration || "")}</span></button>`).join("");
-    $$(".queue-item", $("#queueList")).forEach((item) => item.addEventListener("click", () => Player.playIndex(Number(item.dataset.queueIndex))));
+    const queueList = $("#queueList");
+    queueList.innerHTML = list.map((song, index) => `<button class="queue-item${index === Player.index ? " active" : ""}" type="button" data-queue-index="${index}" aria-current="${index === Player.index ? "true" : "false"}"><span class="queue-number">${index === Player.index ? icon(Player.paused ? "play" : "music") : index + 1}</span><span class="queue-meta"><strong>${esc(song._title || song.title || "未知歌曲")}</strong><span>${esc(song.channel || "未知歌手")}</span></span><span class="dur">${esc(song.duration || "")}</span></button>`).join("");
+    $(".queue-item", queueList).forEach((item) => item.addEventListener("click", () => Player.playIndex(Number(item.dataset.queueIndex))));
   };
-  const detailUrl = (song) => `#song/${encodeURIComponent(song.id)}`;
+  const detailUrl = (song) => song ? `#song/${encodeURIComponent(song.id)}` : "#now-playing";
   const openNowPlaying = ({ updateHistory = true } = {}) => {
     if (!Player.current()) return;
-    if (!nowPlaying.hidden) return;
+    if (isNowPlayingOpen()) return;
+    if (phone) {
+      if (updateHistory) history.pushState({ nowPlaying: true, view: history.state?.view || "home" }, "", detailUrl(Player.current()));
+      phone.open();
+      centerCurrentLyric();
+      return;
+    }
     clearTimeout(closeTimer);
     restoreFocus = document.activeElement;
     backgroundSurfaces.forEach((surface) => { surface.inert = true; });
     nowPlaying.hidden = false;
     $("#app").classList.add("now-playing-open");
     if (updateHistory) history.pushState({ nowPlaying: true, view: history.state?.view || "home" }, "", detailUrl(Player.current()));
-    requestAnimationFrame(() => { nowPlaying.classList.add("open"); $("#npClose").focus(); });
+    requestAnimationFrame(() => { nowPlaying.classList.add("open"); $("#npClose").focus(); centerCurrentLyric(); });
   };
   const closeNowPlaying = ({ fromHistory = false } = {}) => {
-    if (nowPlaying.hidden) return;
+    if (!isNowPlayingOpen()) return;
     if (!fromHistory && history.state?.nowPlaying) { history.back(); return; }
+    stopBrowsingLyrics();
+    if (phone) { phone.close(); return; }
     nowPlaying.classList.remove("open");
     $("#app").classList.remove("now-playing-open");
     closeTimer = setTimeout(() => { nowPlaying.hidden = true; backgroundSurfaces.forEach((surface) => { surface.inert = false; }); restoreFocus?.focus?.(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 240);
@@ -265,8 +311,32 @@ function bindPlayerBar() {
   modeButton.addEventListener("click", () => { const mode = Player.cycleMode(); toast(`已切换为${modeMeta[mode].label}`); });
   npCover.addEventListener("click", () => setLyricsOpen(true));
   lyricsToggle.addEventListener("click", () => setLyricsOpen(!lyricsOpen));
+  lyricsPanel.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    lyricPointers.add(event.pointerId);
+    browseLyrics();
+  }, { passive: true });
+  const releaseLyricPointer = (event) => {
+    if (lyricPointers.delete(event.pointerId)) scheduleLyricFollow();
+  };
+  window.addEventListener("pointerup", releaseLyricPointer, true);
+  window.addEventListener("pointercancel", releaseLyricPointer, true);
+  window.addEventListener("blur", () => {
+    if (!lyricPointers.size) return;
+    lyricPointers.clear();
+    if (browsingLyrics) scheduleLyricFollow();
+  });
+  lyricsPanel.addEventListener("wheel", browseLyrics, { passive: true });
+  lyricsPanel.addEventListener("keydown", (event) => {
+    if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(event.key)) browseLyrics();
+  });
+  lyricsPanel.addEventListener("scroll", () => {
+    // Keep waiting through touch momentum; automatic scrolling never starts a hold.
+    if (browsingLyrics) scheduleLyricFollow();
+  }, { passive: true });
   $("#npClose").addEventListener("click", closeNowPlaying);
   $("#queueToggle").addEventListener("click", () => {
+    if (phone) { phone.toggleQueue(); return; }
     const panel = $("#queuePanel"); const expanded = panel.hidden;
     panel.hidden = !expanded; $("#queueToggle").setAttribute("aria-expanded", String(expanded));
     if (expanded) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -277,33 +347,83 @@ function bindPlayerBar() {
   npSeek.addEventListener("pointerup", () => { seekDragging = false; Player.seek(Number(npSeek.value) / 1000); });
   npSeek.addEventListener("pointercancel", () => { seekDragging = false; });
   npSeek.addEventListener("change", () => { seekDragging = false; Player.seek(Number(npSeek.value) / 1000); });
-  npSeek.addEventListener("input", () => { if (seekDragging) $("#npCurrent").textContent = formatTime(Player.duration * Number(npSeek.value) / 1000); });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !nowPlaying.hidden) { event.preventDefault(); closeNowPlaying(); } });
-  window.addEventListener("popstate", (event) => {
-    if (event.state?.nowPlaying) openNowPlaying({ updateHistory: false });
-    else closeNowPlaying({ fromHistory: true });
+  npSeek.addEventListener("input", () => {
+    if (seekDragging) $("#npCurrent").textContent = formatTime(Player.duration * Number(npSeek.value) / 1000);
+    phone?.setProgress(npSeek.value);
   });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !isNowPlayingOpen()) return;
+    event.preventDefault();
+    if (!phone?.handleQueueEscape()) closeNowPlaying();
+  });
+  window.addEventListener("popstate", (event) => {
+    if (event.state?.nowPlaying) {
+      openNowPlaying({ updateHistory: false });
+      const song = Player.current();
+      if (phone && isNowPlayingOpen()) {
+        if (location.hash !== detailUrl(song)) history.replaceState(event.state, "", detailUrl(song));
+        phone.setQueueOpen(Boolean(event.state.playerQueue));
+      }
+    } else closeNowPlaying({ fromHistory: true });
+  });
+  let hadPhoneTrack;
   Player.on(() => {
-    const song = Player.current(); if (!song) { bar.classList.remove("show"); return; }
+    const song = Player.current();
+    if (phone && hadPhoneTrack !== Boolean(song)) {
+      hadPhoneTrack = Boolean(song);
+      phone.setTrackAvailable(hadPhoneTrack);
+      if (!song) {
+        lyricsController?.abort();
+        lyricsSongId = "";
+        lyricsLines = [];
+        activeLyricIndex = -1;
+        lyricsContent.replaceChildren();
+        setLyricsOpen(false);
+        seekDragging = false;
+        npSeek.value = 0;
+        phone.setProgress(0);
+        npCover.style.backgroundImage = "";
+        npCover.classList.remove("has-cover");
+        $("#npTitle").textContent = "暂未播放";
+        $("#npArtist").textContent = "";
+        $("#npCurrent").textContent = $("#npDuration").textContent = formatTime(0);
+        npPlay.innerHTML = icon("play");
+        npPlay.setAttribute("aria-label", "播放");
+        npPlay.classList.remove("waiting");
+        setFavoriteButton(npFav, false);
+        if (isNowPlayingOpen() && history.state?.nowPlaying) history.replaceState(history.state, "", detailUrl(null));
+      }
+    }
+    if (!song) {
+      bar.classList.remove("show");
+      if (phone) {
+        phone.renderQueue();
+        phone.syncPlayback();
+      }
+      return;
+    }
     bar.classList.add("show"); const cover = $("#pCover"); cover.style.backgroundImage = coverUrl(song.thumbnail); cover.classList.toggle("has-src", Boolean(song.thumbnail));
     $("#pTitle").textContent = song._title || song.title || "未知歌曲"; $("#pSub").textContent = Player.error || song.channel || "";
     $("#miniOpen").setAttribute("aria-label", `打开 ${song._title || song.title || "当前歌曲"} 的播放详情`);
     play.innerHTML = icon(Player.waiting ? "refresh" : Player.paused ? "play" : "pause"); play.classList.toggle("waiting", Player.waiting); play.setAttribute("aria-label", Player.paused ? "播放" : "暂停");
     const value = Player.duration ? Math.round(Player.currentTime / Player.duration * 100) : 0; $("#pFill").style.width = `${value}%`; progress.setAttribute("aria-valuenow", value);
     const favorite = Player.isFav(song.id); setFavoriteButton(miniFav, favorite); setFavoriteButton(npFav, favorite);
-    $("#npCover").style.backgroundImage = coverUrl(song.thumbnail);
+    npCover.style.backgroundImage = coverUrl(song.thumbnail);
+    if (phone) npCover.classList.toggle("has-cover", Boolean(npCover.style.backgroundImage));
     $("#npTitle").textContent = song._title || song.title || "未知歌曲"; $("#npArtist").textContent = song.channel || "未知歌手";
     npPlay.innerHTML = icon(Player.waiting ? "refresh" : Player.paused ? "play" : "pause"); npPlay.classList.toggle("waiting", Player.waiting); npPlay.setAttribute("aria-label", Player.paused ? "播放" : "暂停");
     if (!seekDragging) npSeek.value = Player.duration ? Math.round(Player.currentTime / Player.duration * 1000) : 0;
+    phone?.setProgress(npSeek.value);
     $("#npCurrent").textContent = formatTime(Player.currentTime); $("#npDuration").textContent = formatTime(Player.duration);
     syncModeButton();
     if (lyricsOpen && lyricsSongId !== song.id) loadLyrics(song);
     updateActiveLyric();
-    if (!nowPlaying.hidden && history.state?.nowPlaying && location.hash !== detailUrl(song)) history.replaceState({ ...history.state, nowPlaying: true }, "", detailUrl(song));
+    if (isNowPlayingOpen() && history.state?.nowPlaying && location.hash !== detailUrl(song)) history.replaceState({ ...history.state, nowPlaying: true }, "", detailUrl(song));
     renderQueue();
+    phone?.syncPlayback();
   });
   Player.audio.dispatchEvent(new Event("durationchange"));
-  return { openNowPlaying };
+  return { openNowPlaying, phone };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -327,8 +447,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const detailIndex = Player.queue.findIndex((song) => song.id === requestedId);
     if (detailIndex >= 0) {
       if (detailIndex !== Player.index) Player.playIndex(detailIndex, false);
-      history.replaceState({ nowPlaying: true, view: "home" }, "", `#song/${encodeURIComponent(requestedId)}`);
-      playerUi.openNowPlaying({ updateHistory: false });
+      if (playerUi.phone) playerUi.openNowPlaying();
+      else {
+        history.replaceState({ nowPlaying: true, view: "home" }, "", `#song/${encodeURIComponent(requestedId)}`);
+        playerUi.openNowPlaying({ updateHistory: false });
+      }
     }
   }
   loadHome();

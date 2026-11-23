@@ -55,11 +55,20 @@ final class PlayerPage extends WebViewClient {
             case "/":
             case "/index.html": return asset("index.html", "text/html");
             case "/css/app.css": return asset("css/app.css", "text/css");
+            case "/mini-player.css": return asset("mini-player.css", "text/css");
+            case "/phone-ui.css": return asset("phone-ui.css", "text/css");
+            case "/phone-search.css": return asset("phone-search.css", "text/css");
+            case "/phone-turntable.css": return asset("phone-turntable.css", "text/css");
             case "/js/api.js":
             case "/js/player.js":
             case "/js/app.js":
+            case "/mini-player.js":
+            case "/phone-home.js":
+            case "/phone-search.js":
+            case "/phone-player.js":
             case "/native-audio.js": return asset(path.substring(1), "application/javascript");
             case "/api/playlist":
+            case "/api/playlist-detail":
             case "/api/search":
             case "/api/lyrics":
             case "/health":

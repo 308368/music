@@ -1,0 +1,38 @@
+#player .mini-open {
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+#player .pmeta {
+  display: block;
+  overflow: hidden;
+}
+
+#player .mini-line {
+  display: block;
+}
+
+#player .pctl {
+  flex: none;
+}
+
+.mini-line.is-scrolling .mini-track {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--mini-scroll-gap, 24px);
+  vertical-align: top;
+}
+
+.mini-copy {
+  display: none;
+}
+
+.mini-line.is-scrolling .mini-copy {
+  display: inline;
+}
+
+@media (max-width: 360px) {
+  #player, #player .mini-open { gap: 8px; }
+  #player .pcover { width: 40px; height: 40px; }
+  #player .pctl .icon-button { width: 40px; }
+}

@@ -213,8 +213,22 @@ def api(path, query_string, proxy_url="", device_date="", cache_dir=""):
             query = params.get("q", "").strip()
             if len(query) > 120 or CONTROL.search(query):
                 raise ValueError("搜索词过长或含有无效字符")
-            raw_tracks = _search(query, proxy_url, period) if query else []
-            return _json({"query": query, "results": _track_items(raw_tracks, _limit(params.get("limit"), 20, 50))})
+            kind = params.get("type", "song")
+            limit = _limit(params.get("limit"), 20, 50)
+            if not query:
+                return _json({"query": "", "results": []})
+            if kind == "playlist":
+                from playlist_search import search
+                result = search(params.get("source", "neko"), query, proxy_url, limit)
+            elif kind in ("song", "lyric", "artist", "artistTracks"):
+                from track_search import search
+                result = search(kind, query, proxy_url, limit)
+            else:
+                raise ValueError("无效的搜索分类")
+            return _json({"query": query, **result})
+        if path == "/api/playlist-detail":
+            from playlist_search import detail
+            return _json(detail(params.get("source", ""), params.get("id", ""), proxy_url))
         if path == "/api/playlist":
             today = date.fromisoformat(device_date) if device_date else date.today()
             year, month = today.year, today.month

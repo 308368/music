@@ -17,10 +17,11 @@ public final class AudioBridge {
     private PlaybackService service;
     private boolean destroyed;
     private boolean ready;
-    private String request = "";
+    private String pendingClear;
     private String pendingUrl;
     private String pendingTitle;
     private String pendingArtist;
+    private String pendingTicket;
     private Double pendingSeek;
     private Boolean pendingPlay;
 
@@ -38,11 +39,16 @@ public final class AudioBridge {
             return;
         }
         next.setListener(this::publish);
-        if (pendingUrl != null) next.load(pendingUrl, pendingTitle, pendingArtist);
+        if (pendingClear != null) next.clear(pendingClear);
+        if (pendingUrl != null) next.load(pendingUrl, pendingTitle, pendingArtist, pendingTicket);
         if (pendingSeek != null) next.seek(pendingSeek);
         if (Boolean.TRUE.equals(pendingPlay)) next.play();
         if (Boolean.FALSE.equals(pendingPlay)) next.pause();
+        pendingClear = null;
         pendingUrl = null;
+        pendingTitle = null;
+        pendingArtist = null;
+        pendingTicket = null;
         pendingSeek = null;
         pendingPlay = null;
         publish("sync");
@@ -69,7 +75,7 @@ public final class AudioBridge {
         String src = state.optString("src", "");
         if (!src.isEmpty() && mediaUrl(src) == null) return;
         web.evaluateJavascript("window.receiveNativeAudio && window.receiveNativeAudio("
-                + JSONObject.quote(event) + "," + state + "," + JSONObject.quote(request) + ")", null);
+                + JSONObject.quote(event) + "," + state + "," + JSONObject.quote(state.optString("ticket")) + ")", null);
     }
 
     private static int port(URI url) {
@@ -99,21 +105,40 @@ public final class AudioBridge {
 
     @JavascriptInterface public boolean load(String source, String title, String artist, String ticket) {
         String url = mediaUrl(source);
-        if (url == null || ticket == null || ticket.length() > 64) return false;
+        if (url == null || !validTicket(ticket)) return false;
         main.post(() -> {
             if (destroyed) return;
-            request = ticket;
             if (service != null) {
-                service.load(url, label(title), label(artist));
+                service.load(url, label(title), label(artist), ticket);
             } else {
                 pendingUrl = url;
                 pendingTitle = label(title);
                 pendingArtist = label(artist);
+                pendingTicket = ticket;
                 pendingSeek = null;
                 pendingPlay = null;
             }
         });
         return true;
+    }
+
+    private static boolean validTicket(String ticket) {
+        return ticket != null && ticket.matches("[a-z0-9-]{1,64}");
+    }
+
+    @JavascriptInterface public void clear(String ticket) {
+        if (!validTicket(ticket)) return;
+        main.post(() -> {
+            if (destroyed) return;
+            pendingUrl = null;
+            pendingTitle = null;
+            pendingArtist = null;
+            pendingTicket = null;
+            pendingSeek = null;
+            pendingPlay = null;
+            if (service == null) pendingClear = ticket;
+            else service.clear(ticket);
+        });
     }
 
     @JavascriptInterface public void setPlaying(boolean play) {

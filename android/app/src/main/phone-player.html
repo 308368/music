@@ -1,0 +1,79 @@
+  <svg class="svg-defs" aria-hidden="true">
+    <symbol id="i-collapse" viewBox="0 0 24 24"><path d="m4 9 8 8 8-8"/></symbol>
+    <symbol id="i-loop" viewBox="0 0 24 24"><path d="M20.5 7H9a6 6 0 1 0 6 6m1-10 4.5 4L16 11"/></symbol>
+    <symbol id="i-queue-drawer" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M3 4.5 9 8l-6 3.5z"/><path d="M12 8h9M3 14h18M3 20h18"/></symbol>
+    <symbol id="i-queue-grip" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></symbol>
+    <symbol id="i-queue-trash" viewBox="0 0 24 24"><path d="M4 6h16M9 3h6M6 6l1 14h10l1-14M10 10v6m4-6v6"/></symbol>
+  </svg>
+  <section class="now-playing record-page" id="nowPlaying" aria-labelledby="recordPageTitle" inert>
+    <header class="record-header">
+      <button class="icon-button" id="npClose" type="button" aria-label="收起播放页"><svg class="icon" aria-hidden="true"><use href="#i-collapse"/></svg></button>
+      <h1 id="recordPageTitle">正在播放</h1>
+      <button class="icon-button np-utility" id="npLyricsToggle" type="button" aria-label="显示歌词" aria-controls="lyricsPanel" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-lyrics"/></svg></button>
+    </header>
+    <div class="record-scroll">
+      <div class="np-stage">
+        <div class="turntable" id="turntable">
+          <div class="record-platter">
+            <div class="vinyl-disc">
+              <button class="np-cover record-label" id="npCover" type="button" aria-label="显示歌词"><svg class="icon record-placeholder" aria-hidden="true"><use href="#i-wave"/></svg></button>
+            </div>
+          </div>
+          <svg class="tonearm" viewBox="0 0 320 336" aria-hidden="true">
+            <circle class="arm-mount" cx="184" cy="24" r="14"/>
+            <g class="arm-pivot">
+              <path class="arm-shadow" d="M184 24c9 23 16 44 32 63l21 24"/>
+              <path class="arm-shaft" d="M184 24c9 23 16 44 32 63l21 24"/>
+              <g transform="translate(237 111) rotate(-41)">
+                <rect class="arm-head" x="-5" y="-9" width="10" height="21" rx="2"/>
+                <path class="arm-detail" d="M-2 5h4m-4 3h4"/>
+              </g>
+              <circle class="arm-cap" cx="184" cy="24" r="8"/>
+              <circle class="arm-detail" cx="184" cy="24" r="3"/>
+            </g>
+          </svg>
+        </div>
+        <section class="lyrics-panel" id="lyricsPanel" aria-label="歌词" aria-live="polite" hidden>
+          <div class="lyrics-content" id="lyricsContent"></div>
+        </section>
+      </div>
+      <div class="np-track-row">
+        <div class="np-meta"><h2 id="npTitle">未播放</h2><p id="npArtist"></p><p id="recordError" role="status" hidden></p></div>
+        <button class="icon-button np-fav" id="npFav" type="button" aria-label="收藏"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></button>
+      </div>
+      <div class="np-timeline">
+        <input id="npSeek" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度">
+        <div class="np-times"><time id="npCurrent">0:00</time><time id="npDuration">0:00</time></div>
+      </div>
+      <div class="record-controls" role="group" aria-label="播放控制">
+        <button class="icon-button np-utility" id="npMode" type="button" aria-label="播放模式：顺序播放，点击切换"><svg class="icon" aria-hidden="true"><use href="#i-loop"/></svg></button>
+        <button class="icon-button np-skip" id="npPrev" type="button" aria-label="上一首"><svg class="icon" aria-hidden="true"><use href="#i-prev"/></svg></button>
+        <button class="icon-button np-play" id="npPlay" type="button" aria-label="播放"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button>
+        <button class="icon-button np-skip" id="npNext" type="button" aria-label="下一首"><svg class="icon" aria-hidden="true"><use href="#i-next"/></svg></button>
+        <button class="icon-button" id="queueToggle" type="button" aria-label="播放队列" aria-haspopup="dialog" aria-controls="queuePanel" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-queue-drawer"/></svg></button>
+      </div>
+    </div>
+  </section>
+  <div id="queuePanel" class="record-queue-layer" inert>
+    <button class="queue-scrim" id="queueBackdrop" type="button" tabindex="-1" aria-hidden="true"></button>
+    <section class="record-queue-drawer" role="dialog" aria-modal="true" aria-labelledby="recordQueueTitle">
+      <header class="queue-header">
+        <div><h2 id="recordQueueTitle">播放队列</h2><p id="queueCount"></p></div>
+        <div class="queue-header-actions">
+          <button class="icon-button" id="queueClear" type="button" aria-label="清空播放队列" aria-controls="queueConfirm" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-queue-trash"/></svg></button>
+          <button class="icon-button" id="queueClose" type="button" aria-label="收起播放队列"><svg class="icon" aria-hidden="true"><use href="#i-collapse"/></svg></button>
+        </div>
+      </header>
+      <div class="queue-confirm" id="queueConfirm" role="group" aria-label="确认清空播放队列" hidden>
+        <span>清空后将停止播放。</span>
+        <div class="queue-confirm-actions">
+          <button id="queueClearCancel" type="button">取消</button>
+          <button id="queueClearConfirm" type="button">清空</button>
+        </div>
+      </div>
+      <p class="sr-only" id="queueMoveHint">长按并拖动调整顺序。也可按上、下方向键移动。</p>
+      <p class="sr-only" id="queueStatus" role="status"></p>
+      <p class="queue-empty" id="queueEmpty" hidden>队列为空，播放歌曲后会重新加入。</p>
+      <ol class="queue-list" id="queueList"></ol>
+    </section>
+  </div>

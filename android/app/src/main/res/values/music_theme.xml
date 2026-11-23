@@ -1,0 +1,23 @@
+<resources>
+    <!-- sRGB equivalents of the approved WebView palette. -->
+    <color name="music_surround">#04080C</color>
+    <color name="music_paper">#080E14</color>
+    <color name="music_panel">#101921</color>
+    <color name="music_ink">#E7F0F7</color>
+    <color name="music_muted">#9DAAB4</color>
+    <color name="music_accent">#7FE4FF</color>
+
+    <style name="Theme.Music" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/music_surround</item>
+        <item name="android:statusBarColor">@color/music_surround</item>
+        <item name="android:navigationBarColor">@color/music_surround</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorBackground">@color/music_paper</item>
+        <item name="android:colorBackgroundFloating">@color/music_panel</item>
+        <item name="android:colorForeground">@color/music_ink</item>
+        <item name="android:colorControlNormal">@color/music_muted</item>
+        <item name="android:colorAccent">@color/music_accent</item>
+        <item name="android:dialogCornerRadius">16dp</item>
+    </style>
+</resources>

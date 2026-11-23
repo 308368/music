@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>汽水音乐 · 安卓界面原型</title>
+  <link rel="stylesheet" href="../app/src/main/assets/mini-player.css">
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+  <svg class="defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="wave" viewBox="0 0 24 24"><path d="M2 12h3l2-5 3 11 4-14 3 12 2-4h3"/></symbol>
+    <symbol id="net" viewBox="0 0 24 24"><path d="M3 9a14 14 0 0 1 18 0M6 13a9 9 0 0 1 12 0m-9 4a4.5 4.5 0 0 1 6 0m-3 4h.01"/></symbol>
+    <symbol id="home-icon" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3zM9 20v-7h6v7"/></symbol>
+    <symbol id="search-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="user-icon" viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/></symbol>
+    <symbol id="play" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M8 4.5 20 12 8 19.5z"/></symbol>
+    <symbol id="pause" viewBox="0 0 24 24"><path stroke-width="2.5" d="M9 5v14m6-14v14"/></symbol>
+    <symbol id="prev" viewBox="0 0 24 24"><path d="M5 5v14m13-14L8 12l10 7z"/></symbol>
+    <symbol id="next" viewBox="0 0 24 24"><path d="M19 5v14M6 5l10 7-10 7z"/></symbol>
+    <symbol id="heart" viewBox="0 0 24 24"><path d="M12 20 4.6 12.8a4.8 4.8 0 0 1 6.8-6.8l.6.7.6-.7a4.8 4.8 0 0 1 6.8 6.8z"/></symbol>
+    <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 4v5h-5M4 20v-5h5"/><path d="M4.8 10a7.5 7.5 0 0 1 12.4-4.1L20 9M4 15l2.8 3.1A7.5 7.5 0 0 0 19.2 14"/></symbol>
+    <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="collapse" viewBox="0 0 24 24"><path d="m4 9 8 8 8-8"/></symbol>
+    <symbol id="loop" viewBox="0 0 24 24"><path d="M20.5 7H9a6 6 0 1 0 6 6m1-10 4.5 4L16 11"/></symbol>
+    <symbol id="queue-icon" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M3 4.5 9 8l-6 3.5z"/><path d="M12 8h9M3 14h18M3 20h18"/></symbol>
+    <symbol id="queue-grip" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></symbol>
+    <symbol id="trash" viewBox="0 0 24 24"><path d="M4 6h16m-10 0V4h4v2m4 0-1 14H7L6 6m4 4v6m4-6v6"/></symbol>
+  </svg>
+  <div class="app">
+  <div class="app-view" id="browseView">
+    <header class="top">
+      <h1 class="brand"><svg class="icon" aria-hidden="true"><use href="#wave"/></svg>汽水音乐</h1>
+      <button class="network" type="button" id="netOpen"><svg class="icon" aria-hidden="true"><use href="#net"/></svg>网络设置</button>
+    </header>
+    <main class="scroll" id="scroll">
+      <section id="home" aria-label="首页">
+        <div class="feature">
+          <canvas id="featureArt" aria-hidden="true" width="860" height="460"></canvas>
+          <div class="feature-heading">
+            <div>
+              <h2>本月抖音热曲</h2>
+              <p>2026 年 11 月 · 歌单示例</p>
+            </div>
+            <button class="icon-button" id="refreshSongs" type="button" aria-label="刷新示例歌单" title="刷新示例歌单"><svg class="icon" aria-hidden="true"><use href="#refresh"/></svg></button>
+          </div>
+          <button class="primary" id="playAll" type="button"><svg class="icon" aria-hidden="true"><use href="#play"/></svg>播放全部</button>
+        </div>
+        <ol class="song-list" id="homeList"></ol>
+      </section>
+      <section id="search" aria-labelledby="searchTitle" hidden>
+        <h2 class="page-title" id="searchTitle">搜索</h2>
+        <form class="search-form" role="search">
+          <label class="field">歌名或歌手<input type="search" id="query" placeholder="试试「雨爱」或「林俊杰」" autocomplete="off"></label>
+        </form>
+        <p class="subtle" id="searchHint" role="status">输入歌名或歌手，搜索示例曲目。</p>
+        <ol class="song-list" id="searchList"></ol>
+      </section>
+      <section id="library" aria-labelledby="libraryTitle" hidden>
+        <h2 class="page-title" id="libraryTitle">我的音乐</h2>
+        <div class="section-head"><div><h3>我喜欢的音乐</h3><p id="favoriteCount"></p></div></div>
+        <p class="subtle" id="favoriteHint">点击播放器里的爱心收藏歌曲。</p>
+        <ol class="song-list" id="favoriteList"></ol>
+      </section>
+    </main>
+    <div class="dock">
+      <aside class="mini" id="player" aria-label="当前播放">
+        <div class="mini-progress" aria-hidden="true"><span id="progress"></span></div>
+        <button id="miniOpen" class="mini-open" type="button" aria-controls="nowPlaying">
+          <canvas width="100" height="100" class="tile" id="miniArt" aria-hidden="true"></canvas>
+          <span class="pmeta">
+            <span class="mini-line pt"><span class="mini-track"><span id="pTitle"></span></span></span>
+            <span class="mini-line ps"><span class="mini-track"><span id="pSub"></span></span></span>
+          </span>
+        </button>
+        <button class="icon-button" type="button" data-step="-1" aria-label="上一首"><svg class="icon" aria-hidden="true"><use href="#prev"/></svg></button>
+        <button class="icon-button" type="button" data-favorite aria-label="收藏" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#heart"/></svg></button>
+        <button class="icon-button play" type="button" data-toggle aria-label="播放"><svg class="icon" aria-hidden="true"><use href="#play"/></svg></button>
+        <button class="icon-button" type="button" data-step="1" aria-label="下一首"><svg class="icon" aria-hidden="true"><use href="#next"/></svg></button>
+      </aside>
+      <nav class="nav" aria-label="主导航">
+        <button type="button" data-go="home" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#home-icon"/></svg>首页</button>
+        <button type="button" data-go="search"><svg class="icon" aria-hidden="true"><use href="#search-icon"/></svg>搜索</button>
+        <button type="button" data-go="library"><svg class="icon" aria-hidden="true"><use href="#user-icon"/></svg>我的</button>
+      </nav>
+    </div>
+  </div>
+  <main class="app-view record-page" id="nowPlaying" aria-labelledby="detailTitle" inert>
+    <header class="record-header">
+      <button class="icon-button" type="button" id="collapsePlayer" aria-label="收起播放页"><svg class="icon" aria-hidden="true"><use href="#collapse"/></svg></button>
+      <h1 id="detailTitle">正在播放</h1>
+    </header>
+    <div class="turntable" id="turntable" aria-hidden="true">
+      <div class="record-platter">
+        <div class="vinyl-disc"><canvas class="record-label" width="560" height="560" id="detailArt"></canvas></div>
+      </div>
+      <svg class="tonearm" viewBox="0 0 320 336">
+        <circle class="arm-mount" cx="184" cy="24" r="14"/>
+        <g class="arm-pivot">
+          <path class="arm-shadow" d="M184 24c9 23 16 44 32 63l21 24"/>
+          <path class="arm-shaft" d="M184 24c9 23 16 44 32 63l21 24"/>
+          <g transform="translate(237 111) rotate(-41)">
+            <rect class="arm-head" x="-5" y="-9" width="10" height="21" rx="2"/>
+            <path class="arm-detail" d="M-2 5h4m-4 3h4"/>
+          </g>
+          <circle class="arm-cap" cx="184" cy="24" r="8"/>
+          <circle class="arm-detail" cx="184" cy="24" r="3"/>
+        </g>
+      </svg>
+    </div>
+    <div class="record-info">
+      <div class="record-meta"><h2 id="detailSong"></h2><p id="detailArtist"></p></div>
+      <button class="icon-button" type="button" data-favorite aria-label="收藏" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#heart"/></svg></button>
+    </div>
+    <div class="record-timeline">
+      <input id="seek" type="range" value="92" min="0" step="1" aria-label="播放进度">
+      <div class="time-row"><span class="time" id="elapsed"></span><span class="time" id="duration"></span></div>
+    </div>
+    <div class="record-controls" role="group" aria-label="播放控制">
+      <button class="icon-button loop-button" id="loopPlayback" type="button" aria-label="列表循环" aria-pressed="false" title="列表循环"><svg class="icon" aria-hidden="true"><use href="#loop"/></svg></button>
+      <button class="icon-button" type="button" data-step="-1" aria-label="上一首"><svg class="icon" aria-hidden="true"><use href="#prev"/></svg></button>
+      <button class="icon-button play record-play" type="button" data-toggle aria-label="播放"><svg class="icon" aria-hidden="true"><use href="#play"/></svg></button>
+      <button class="icon-button" type="button" data-step="1" aria-label="下一首"><svg class="icon" aria-hidden="true"><use href="#next"/></svg></button>
+      <button class="icon-button" id="openQueue" type="button" aria-label="播放队列" aria-haspopup="dialog" aria-controls="queueDrawer" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#queue-icon"/></svg></button>
+    </div>
+  </main>
+  </div>
+  <dialog class="queue-drawer" id="queueDrawer" aria-labelledby="queueTitle">
+    <header class="queue-header">
+      <div><h2 id="queueTitle">播放队列</h2><p class="subtle" id="queueCount"></p></div>
+      <div class="queue-header-actions">
+        <button class="icon-button" id="clearQueue" type="button" aria-label="清空播放队列" title="清空播放队列"><svg class="icon" aria-hidden="true"><use href="#trash"/></svg></button>
+        <button class="icon-button" id="collapseQueue" type="button" data-close autofocus aria-label="收起播放队列"><svg class="icon" aria-hidden="true"><use href="#collapse"/></svg></button>
+      </div>
+    </header>
+    <div class="queue-confirm" id="queueConfirm" role="group" aria-label="确认清空播放队列" hidden>
+      <p>清空播放队列？</p>
+      <div class="queue-confirm-actions">
+        <button id="cancelClearQueue" type="button">取消</button>
+        <button id="confirmClearQueue" type="button">清空</button>
+      </div>
+    </div>
+    <p class="visually-hidden" id="queueMoveHint">长按并拖动调整顺序。也可按上、下方向键移动。</p>
+    <p class="visually-hidden" id="queueStatus" role="status"></p>
+    <p class="subtle queue-empty" id="queueEmpty" hidden>暂无曲目</p>
+    <ol class="song-list" id="queueList"></ol>
+  </dialog>
+  <dialog class="detail" id="network" aria-labelledby="networkTitle">
+    <header class="detail-header"><h2 id="networkTitle">网络设置</h2><button class="icon-button" type="button" data-close aria-label="关闭网络设置"><svg class="icon" aria-hidden="true"><use href="#close"/></svg></button></header>
+    <p class="subtle">原型预览。可体验设置界面。</p>
+    <form method="dialog" class="search-form">
+      <label class="field">代理地址<input type="text" placeholder="留空时使用直连"></label>
+      <label class="field">代理端口<input type="number" min="1" max="65535" placeholder="例如 7890"></label>
+      <button class="primary" type="submit">完成</button>
+    </form>
+  </dialog>
+  <script src="../app/src/main/assets/mini-player.js"></script>
+  <script src="preview.js"></script>
+</body>
+</html>

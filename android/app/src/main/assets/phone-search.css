@@ -1,0 +1,23 @@
+.search-types { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.search-types button { flex: 1; min-height: 46px; color: var(--muted); background: transparent; }
+.search-types button[aria-pressed="true"] { color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 9px; text-decoration-thickness: 2px; }
+.search-choice, .search-unmatched { display: flex; width: 100%; min-height: 62px; align-items: center; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+.search-choice:active { background: var(--surface-2); }
+.search-choice-symbol { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 8px; background: var(--surface); color: var(--muted); }
+.search-choice-meta, .search-unmatched > span { min-width: 0; flex: 1; }
+.search-choice-meta strong, .search-choice-meta small, .search-unmatched strong, .search-unmatched small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.search-choice-meta strong, .search-unmatched strong { font-size: 15px; font-weight: 600; }
+.search-choice-meta small, .search-unmatched small, .search-progress { color: var(--muted); font-size: 13px; }
+.search-choice-meta small { margin-top: 3px; }
+.search-chevron { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+.search-progress:not(:empty) { padding: 16px 0; }
+.search-progress button { display: block; min-height: 44px; }
+.search-detail-open #searchShell, .search-detail-open #searchTitle, .search-types[hidden] { display: none; }
+.search-back, .search-play-all { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 14px; color: var(--accent); }
+.search-back .search-chevron { transform: rotate(180deg); color: inherit; }
+#searchDetail .page-title { overflow-wrap: anywhere; margin-bottom: 4px; }
+.search-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.search-play-all { flex: none; }
+.search-play-all .icon { width: 17px; height: 17px; }
+.lyric-hit { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 5px; font-size: 13px; line-height: 1.45; color: var(--accent); }
+.search-unmatched { color: var(--muted); }
